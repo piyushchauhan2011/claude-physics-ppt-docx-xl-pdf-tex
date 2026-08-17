@@ -1,0 +1,19 @@
+# Python
+venv/
+__pycache__/
+*.pyc
+
+# LaTeX build artifacts (script cleans these up, but just in case)
+*.aux
+*.log
+*.out
+paper_build/
+
+# Playwright MCP test artifacts
+.playwright-mcp/
+
+# Claude Code local settings
+.claude/settings.local.json
+
+# macOS
+.DS_Store

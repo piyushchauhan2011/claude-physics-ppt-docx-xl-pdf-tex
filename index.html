@@ -1,0 +1,915 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>2D Projectile Motion — Air Resistance Simulator</title>
+<style>
+  :root {
+    --bg: #0a0e16;
+    --panel: #121926;
+    --panel-2: #0d1420;
+    --border: #22303f;
+    --text: #e7ecf3;
+    --text-dim: #8b98ad;
+    --text-dimmer: #5c6a80;
+    --accent: #2ec4b6;
+    --accent-dark: #1e8f84;
+    --gold: #f2a63d;
+    --blue: #6f9dff;
+    --pink: #ff6b8b;
+    --danger: #e0473a;
+    --drag-color: #2ec4b6;
+    --ideal-color: #93a1b8;
+    --radius: 10px;
+  }
+
+  * { box-sizing: border-box; }
+
+  html, body {
+    margin: 0;
+    height: 100%;
+    background: var(--bg);
+    color: var(--text);
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif;
+  }
+
+  .app {
+    display: grid;
+    grid-template-columns: 336px 1fr;
+    height: 100vh;
+    width: 100vw;
+    overflow: hidden;
+  }
+
+  /* ---------------- Sidebar ---------------- */
+  .sidebar {
+    background: var(--panel);
+    border-right: 1px solid var(--border);
+    overflow-y: auto;
+    padding: 20px 18px 32px;
+  }
+
+  .brand {
+    margin-bottom: 18px;
+  }
+  .brand h1 {
+    font-size: 17px;
+    margin: 0 0 4px;
+    color: #fff;
+    letter-spacing: 0.2px;
+  }
+  .brand p {
+    margin: 0;
+    font-size: 12px;
+    color: var(--text-dim);
+    line-height: 1.4;
+  }
+
+  .section {
+    margin-bottom: 18px;
+    padding-top: 14px;
+    border-top: 1px solid var(--border);
+  }
+  .section:first-of-type { border-top: none; padding-top: 0; }
+
+  .section-title {
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--accent);
+    margin: 0 0 10px;
+  }
+
+  .control { margin-bottom: 12px; }
+  .control:last-child { margin-bottom: 0; }
+
+  .control-label {
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+    font-size: 12.5px;
+    color: var(--text);
+    margin-bottom: 4px;
+  }
+  .control-label .val {
+    font-variant-numeric: tabular-nums;
+    color: var(--gold);
+    font-weight: 600;
+    font-size: 12px;
+  }
+
+  input[type="range"] {
+    width: 100%;
+    accent-color: var(--accent);
+    height: 18px;
+    cursor: pointer;
+  }
+
+  .speed-group {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 6px;
+  }
+  .speed-btn {
+    background: var(--panel-2);
+    border: 1px solid var(--border);
+    color: var(--text-dim);
+    border-radius: 6px;
+    padding: 7px 0;
+    font-size: 12px;
+    cursor: pointer;
+    transition: all .12s ease;
+  }
+  .speed-btn:hover { border-color: var(--accent-dark); color: var(--text); }
+  .speed-btn.active {
+    background: var(--accent);
+    border-color: var(--accent);
+    color: #04201d;
+    font-weight: 700;
+  }
+
+  .toggle-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 12.5px;
+    color: var(--text);
+    margin-bottom: 8px;
+    cursor: pointer;
+    user-select: none;
+  }
+  .toggle-row:last-child { margin-bottom: 0; }
+  .toggle-row input[type="checkbox"] {
+    accent-color: var(--accent);
+    width: 15px;
+    height: 15px;
+    cursor: pointer;
+  }
+
+  .actions { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+  .btn {
+    border: 1px solid var(--border);
+    background: var(--panel-2);
+    color: var(--text);
+    padding: 10px 8px;
+    border-radius: 8px;
+    font-size: 12.5px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all .12s ease;
+  }
+  .btn:hover { border-color: var(--accent-dark); }
+  .btn:active { transform: translateY(1px); }
+  .btn:disabled { opacity: .4; cursor: not-allowed; }
+  .btn.primary {
+    grid-column: 1 / -1;
+    background: var(--accent);
+    border-color: var(--accent);
+    color: #04201d;
+    padding: 12px 8px;
+    font-size: 13.5px;
+  }
+  .btn.primary:hover { background: #38d6c7; }
+  .btn.danger:hover { border-color: var(--danger); color: #ffb0a8; }
+
+  .hint {
+    font-size: 10.5px;
+    color: var(--text-dimmer);
+    margin-top: 10px;
+    line-height: 1.5;
+  }
+
+  /* ---------------- Stage ---------------- */
+  .stage {
+    position: relative;
+    background: var(--panel-2);
+    overflow: hidden;
+  }
+  #sim {
+    display: block;
+    width: 100%;
+    height: 100%;
+  }
+
+  .telemetry {
+    position: absolute;
+    top: 16px;
+    left: 16px;
+    background: rgba(10, 14, 22, 0.82);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 12px 16px;
+    backdrop-filter: blur(6px);
+    min-width: 200px;
+    pointer-events: none;
+  }
+  .telemetry .status {
+    font-size: 10.5px;
+    font-weight: 700;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--accent);
+    margin-bottom: 8px;
+  }
+  .telemetry .status.landed { color: var(--gold); }
+  .telemetry .status.idle { color: var(--text-dimmer); }
+  .tel-row {
+    display: flex;
+    justify-content: space-between;
+    gap: 18px;
+    font-size: 12.5px;
+    color: var(--text-dim);
+    padding: 2px 0;
+    font-variant-numeric: tabular-nums;
+  }
+  .tel-row b { color: var(--text); font-weight: 600; }
+  .tel-row span.v { color: #fff; font-weight: 600; }
+
+  .legend {
+    position: absolute;
+    bottom: 16px;
+    left: 16px;
+    background: rgba(10, 14, 22, 0.82);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 10px 14px;
+    backdrop-filter: blur(6px);
+    font-size: 11.5px;
+    color: var(--text-dim);
+    pointer-events: none;
+  }
+  .legend-row { display: flex; align-items: center; gap: 8px; margin-bottom: 5px; }
+  .legend-row:last-child { margin-bottom: 0; }
+  .swatch { width: 18px; height: 3px; border-radius: 2px; flex-shrink: 0; }
+  .swatch.dashed {
+    background: repeating-linear-gradient(90deg, var(--ideal-color) 0 5px, transparent 5px 9px);
+    height: 2px;
+  }
+  .swatch.vx { background: var(--gold); }
+  .swatch.vy { background: var(--blue); }
+  .swatch.vtot { background: var(--pink); }
+
+  .scale-badge {
+    position: absolute;
+    top: 16px;
+    right: 16px;
+    background: rgba(10, 14, 22, 0.82);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 8px 12px;
+    font-size: 11px;
+    color: var(--text-dim);
+    backdrop-filter: blur(6px);
+    pointer-events: none;
+  }
+
+  @media (max-width: 880px) {
+    .app { grid-template-columns: 1fr; grid-template-rows: auto 1fr; }
+    .sidebar { border-right: none; border-bottom: 1px solid var(--border); max-height: 46vh; }
+  }
+</style>
+</head>
+<body>
+
+<div class="app">
+  <aside class="sidebar">
+    <div class="brand">
+      <h1>Projectile Motion — Drag Simulator</h1>
+      <p>2D kinematics with quadratic air resistance, integrated numerically (Euler method) and compared against the ideal vacuum trajectory.</p>
+    </div>
+
+    <div class="section">
+      <p class="section-title">Launch Parameters</p>
+      <div class="control">
+        <div class="control-label"><span>Launch Velocity v₀</span><span class="val" id="val-v0">25.0 m/s</span></div>
+        <input type="range" id="v0" min="5" max="100" step="0.5" value="25">
+      </div>
+      <div class="control">
+        <div class="control-label"><span>Launch Angle θ</span><span class="val" id="val-theta">45°</span></div>
+        <input type="range" id="theta" min="0" max="90" step="1" value="45">
+      </div>
+    </div>
+
+    <div class="section">
+      <p class="section-title">Projectile Properties</p>
+      <div class="control">
+        <div class="control-label"><span>Mass m</span><span class="val" id="val-mass">0.25 kg</span></div>
+        <input type="range" id="mass" min="0.05" max="10" step="0.05" value="0.25">
+      </div>
+      <div class="control">
+        <div class="control-label"><span>Radius r</span><span class="val" id="val-radius">0.050 m</span></div>
+        <input type="range" id="radius" min="0.01" max="0.5" step="0.005" value="0.05">
+      </div>
+    </div>
+
+    <div class="section">
+      <p class="section-title">Environment</p>
+      <div class="control">
+        <div class="control-label"><span>Drag Coefficient Cd</span><span class="val" id="val-cd">0.47</span></div>
+        <input type="range" id="cd" min="0" max="1" step="0.01" value="0.47">
+      </div>
+      <div class="control">
+        <div class="control-label"><span>Air Density ρ</span><span class="val" id="val-rho">1.225 kg/m³</span></div>
+        <input type="range" id="rho" min="0" max="2" step="0.005" value="1.225">
+      </div>
+      <div class="control">
+        <div class="control-label"><span>Gravity g</span><span class="val" id="val-gravity">9.81 m/s²</span></div>
+        <input type="range" id="gravity" min="1" max="25" step="0.01" value="9.81">
+      </div>
+    </div>
+
+    <div class="section">
+      <p class="section-title">Simulation Speed</p>
+      <div class="speed-group" id="speed-group">
+        <button class="speed-btn" data-speed="0.5">0.5×</button>
+        <button class="speed-btn active" data-speed="1">1×</button>
+        <button class="speed-btn" data-speed="2">2×</button>
+        <button class="speed-btn" data-speed="5">5×</button>
+      </div>
+    </div>
+
+    <div class="section">
+      <p class="section-title">Display</p>
+      <label class="toggle-row">
+        <input type="checkbox" id="toggle-vectors" checked>
+        Show velocity vectors (vₓ, v_y, v_total)
+      </label>
+      <label class="toggle-row">
+        <input type="checkbox" id="toggle-grid" checked>
+        Show grid overlay
+      </label>
+    </div>
+
+    <div class="section">
+      <p class="section-title">Actions</p>
+      <div class="actions">
+        <button class="btn primary" id="btn-launch">▶ Launch</button>
+        <button class="btn" id="btn-pause" disabled>Pause</button>
+        <button class="btn" id="btn-reset">Reset</button>
+        <button class="btn danger" id="btn-clear">Clear Trails</button>
+      </div>
+      <p class="hint">Teal = trajectory with drag. Dashed gray = ideal vacuum reference, launched with identical v₀ and θ. Set ρ = 0 to make them coincide.</p>
+    </div>
+  </aside>
+
+  <main class="stage">
+    <canvas id="sim"></canvas>
+
+    <div class="telemetry">
+      <div class="status idle" id="tel-status">Ready to Launch</div>
+      <div class="tel-row"><b>Time t</b><span class="v" id="tel-t">0.00 s</span></div>
+      <div class="tel-row"><b>Position x</b><span class="v" id="tel-x">0.00 m</span></div>
+      <div class="tel-row"><b>Position y</b><span class="v" id="tel-y">0.00 m</span></div>
+      <div class="tel-row"><b>Speed v</b><span class="v" id="tel-v">0.00 m/s</span></div>
+      <div class="tel-row"><b>Max Height H</b><span class="v" id="tel-hmax">0.00 m</span></div>
+      <div class="tel-row"><b>Range R</b><span class="v" id="tel-r">—</span></div>
+    </div>
+
+    <div class="legend">
+      <div class="legend-row"><span class="swatch" style="background:var(--drag-color)"></span>Trajectory with drag</div>
+      <div class="legend-row"><span class="swatch dashed"></span>Ideal trajectory (vacuum)</div>
+      <div class="legend-row"><span class="swatch vx"></span>v<sub>x</sub> component</div>
+      <div class="legend-row"><span class="swatch vy"></span>v<sub>y</sub> component</div>
+      <div class="legend-row"><span class="swatch vtot"></span>v<sub>total</sub></div>
+    </div>
+
+    <div class="scale-badge" id="scale-badge">scale: —</div>
+  </main>
+</div>
+
+<script>
+(function () {
+  "use strict";
+
+  // ---------------------------------------------------------------------
+  // DOM references
+  // ---------------------------------------------------------------------
+  const canvas = document.getElementById("sim");
+  const ctx = canvas.getContext("2d");
+  const stage = document.querySelector(".stage");
+
+  const sliders = {
+    v0: document.getElementById("v0"),
+    theta: document.getElementById("theta"),
+    mass: document.getElementById("mass"),
+    radius: document.getElementById("radius"),
+    cd: document.getElementById("cd"),
+    rho: document.getElementById("rho"),
+    gravity: document.getElementById("gravity"),
+  };
+  const valLabels = {
+    v0: document.getElementById("val-v0"),
+    theta: document.getElementById("val-theta"),
+    mass: document.getElementById("val-mass"),
+    radius: document.getElementById("val-radius"),
+    cd: document.getElementById("val-cd"),
+    rho: document.getElementById("val-rho"),
+    gravity: document.getElementById("val-gravity"),
+  };
+
+  const speedGroup = document.getElementById("speed-group");
+  const toggleVectors = document.getElementById("toggle-vectors");
+  const toggleGrid = document.getElementById("toggle-grid");
+
+  const btnLaunch = document.getElementById("btn-launch");
+  const btnPause = document.getElementById("btn-pause");
+  const btnReset = document.getElementById("btn-reset");
+  const btnClear = document.getElementById("btn-clear");
+
+  const telStatus = document.getElementById("tel-status");
+  const telT = document.getElementById("tel-t");
+  const telX = document.getElementById("tel-x");
+  const telY = document.getElementById("tel-y");
+  const telV = document.getElementById("tel-v");
+  const telHmax = document.getElementById("tel-hmax");
+  const telR = document.getElementById("tel-r");
+  const scaleBadge = document.getElementById("scale-badge");
+
+  // ---------------------------------------------------------------------
+  // Simulation state
+  // ---------------------------------------------------------------------
+  const FIXED_DT = 1 / 240; // physics timestep, seconds of SIM time
+  const MAX_SUBSTEPS_PER_FRAME = 4000; // safety cap
+
+  let speedMult = 1;
+
+  const sim = {
+    hasLaunched: false,
+    running: false,
+    paused: false,
+    dragLanded: false,
+    idealLanded: false,
+
+    t: 0,
+    // drag body state
+    x: 0, y: 0, vx: 0, vy: 0,
+    // ideal (vacuum) closed-form params, fixed at launch
+    vx0: 0, vy0: 0, idealFlightTime: 0,
+
+    Hmax: 0,
+    R: null,
+
+    dragTrail: [],
+    idealTrail: [],
+
+    bounds: { xMax: 10, yMax: 10 }, // world-space view bounds (meters)
+  };
+
+  function readParams() {
+    return {
+      v0: parseFloat(sliders.v0.value),
+      theta: parseFloat(sliders.theta.value),
+      m: parseFloat(sliders.mass.value),
+      r: parseFloat(sliders.radius.value),
+      Cd: parseFloat(sliders.cd.value),
+      rho: parseFloat(sliders.rho.value),
+      g: parseFloat(sliders.gravity.value),
+    };
+  }
+
+  function dragK(p) {
+    return 0.5 * p.rho * p.Cd * Math.PI * p.r * p.r;
+  }
+
+  // ---------------------------------------------------------------------
+  // View bounds (auto-fit) — the vacuum trajectory is always an upper
+  // bound on range/height for the drag trajectory under quadratic drag,
+  // so sizing the view from the ideal prediction keeps everything on
+  // screen without needing to rescale mid-flight.
+  // ---------------------------------------------------------------------
+  function computeBounds(p) {
+    const th = (p.theta * Math.PI) / 180;
+    const vy0 = p.v0 * Math.sin(th);
+    const Hpred = (vy0 * vy0) / (2 * p.g);
+    const Rpred = (p.v0 * p.v0 * Math.sin(2 * th)) / p.g;
+    const xMax = Math.max(Rpred, 5) * 1.15 + 2;
+    const yMax = Math.max(Hpred, 2) * 1.35 + 2;
+    return { xMax, yMax };
+  }
+
+  function refreshBoundsFromSliders() {
+    if (sim.running) return; // don't yank the view mid-flight
+    sim.bounds = computeBounds(readParams());
+  }
+
+  // ---------------------------------------------------------------------
+  // Physics step
+  // ---------------------------------------------------------------------
+  function stepPhysics(dt, p, k) {
+    sim.t += dt;
+
+    if (!sim.dragLanded) {
+      const v = Math.sqrt(sim.vx * sim.vx + sim.vy * sim.vy);
+      const ax = -(k / p.m) * v * sim.vx;
+      const ay = -p.g - (k / p.m) * v * sim.vy;
+
+      const xNew = sim.x + sim.vx * dt;
+      const yNewRaw = sim.y + sim.vy * dt;
+      const vxNew = sim.vx + ax * dt;
+      const vyNew = sim.vy + ay * dt;
+
+      if (yNewRaw <= 0) {
+        sim.x = xNew;
+        sim.y = 0;
+        sim.R = xNew;
+        sim.dragLanded = true;
+      } else {
+        sim.x = xNew;
+        sim.y = yNewRaw;
+        sim.vx = vxNew;
+        sim.vy = vyNew;
+        if (sim.y > sim.Hmax) sim.Hmax = sim.y;
+      }
+      sim.dragTrail.push({ x: sim.x, y: sim.y });
+    }
+
+    if (!sim.idealLanded) {
+      const tEff = Math.min(sim.t, sim.idealFlightTime);
+      const xi = sim.vx0 * tEff;
+      const yi = Math.max(0, sim.vy0 * tEff - 0.5 * p.g * tEff * tEff);
+      sim.idealTrail.push({ x: xi, y: yi });
+      if (sim.t >= sim.idealFlightTime) sim.idealLanded = true;
+    }
+  }
+
+  // ---------------------------------------------------------------------
+  // Actions
+  // ---------------------------------------------------------------------
+  function launch() {
+    const p = readParams();
+    const th = (p.theta * Math.PI) / 180;
+
+    sim.hasLaunched = true;
+    sim.running = true;
+    sim.paused = false;
+    sim.dragLanded = false;
+    sim.idealLanded = false;
+
+    sim.t = 0;
+    sim.x = 0;
+    sim.y = 0;
+    sim.vx = p.v0 * Math.cos(th);
+    sim.vy = p.v0 * Math.sin(th);
+
+    sim.vx0 = sim.vx;
+    sim.vy0 = sim.vy;
+    sim.idealFlightTime = (2 * sim.vy0) / p.g;
+    if (sim.idealFlightTime <= 0) sim.idealLanded = true;
+
+    sim.Hmax = 0;
+    sim.R = null;
+    sim.dragTrail = [{ x: 0, y: 0 }];
+    sim.idealTrail = [{ x: 0, y: 0 }];
+
+    sim.bounds = computeBounds(p);
+
+    btnPause.disabled = false;
+    btnPause.textContent = "Pause";
+    accumulator = 0;
+  }
+
+  function togglePause() {
+    if (!sim.running) return;
+    sim.paused = !sim.paused;
+    btnPause.textContent = sim.paused ? "Resume" : "Pause";
+  }
+
+  function reset() {
+    sim.hasLaunched = false;
+    sim.running = false;
+    sim.paused = false;
+    sim.dragLanded = false;
+    sim.idealLanded = false;
+    sim.t = 0;
+    sim.x = 0; sim.y = 0; sim.vx = 0; sim.vy = 0;
+    sim.Hmax = 0;
+    sim.R = null;
+    sim.dragTrail = [];
+    sim.idealTrail = [];
+    accumulator = 0;
+    btnPause.disabled = true;
+    btnPause.textContent = "Pause";
+    refreshBoundsFromSliders();
+  }
+
+  function clearTrails() {
+    sim.dragTrail = sim.hasLaunched ? [{ x: sim.x, y: sim.y }] : [];
+    sim.idealTrail = sim.hasLaunched ? [{ x: sim.x, y: sim.y }] : [];
+  }
+
+  btnLaunch.addEventListener("click", launch);
+  btnPause.addEventListener("click", togglePause);
+  btnReset.addEventListener("click", reset);
+  btnClear.addEventListener("click", clearTrails);
+
+  speedGroup.addEventListener("click", (e) => {
+    const btn = e.target.closest(".speed-btn");
+    if (!btn) return;
+    speedMult = parseFloat(btn.dataset.speed);
+    [...speedGroup.children].forEach((b) => b.classList.toggle("active", b === btn));
+  });
+
+  // ---------------------------------------------------------------------
+  // Slider live labels + bounds preview
+  // ---------------------------------------------------------------------
+  function fmtSlider(id, value) {
+    switch (id) {
+      case "v0": return `${value.toFixed(1)} m/s`;
+      case "theta": return `${value.toFixed(0)}°`;
+      case "mass": return `${value.toFixed(2)} kg`;
+      case "radius": return `${value.toFixed(3)} m`;
+      case "cd": return value.toFixed(2);
+      case "rho": return `${value.toFixed(3)} kg/m³`;
+      case "gravity": return `${value.toFixed(2)} m/s²`;
+      default: return `${value}`;
+    }
+  }
+
+  Object.keys(sliders).forEach((key) => {
+    sliders[key].addEventListener("input", () => {
+      valLabels[key].textContent = fmtSlider(key, parseFloat(sliders[key].value));
+      refreshBoundsFromSliders();
+    });
+    valLabels[key].textContent = fmtSlider(key, parseFloat(sliders[key].value));
+  });
+
+  refreshBoundsFromSliders();
+
+  // ---------------------------------------------------------------------
+  // Canvas sizing (device-pixel-ratio aware)
+  // ---------------------------------------------------------------------
+  let cssW = 0, cssH = 0;
+
+  function resizeCanvas() {
+    const rect = stage.getBoundingClientRect();
+    cssW = rect.width;
+    cssH = rect.height;
+    const dpr = window.devicePixelRatio || 1;
+    canvas.width = Math.round(cssW * dpr);
+    canvas.height = Math.round(cssH * dpr);
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  }
+
+  new ResizeObserver(resizeCanvas).observe(stage);
+  resizeCanvas();
+
+  // ---------------------------------------------------------------------
+  // Nice-number grid step helper
+  // ---------------------------------------------------------------------
+  function niceNum(range, round) {
+    const exponent = Math.floor(Math.log10(range));
+    const fraction = range / Math.pow(10, exponent);
+    let niceFraction;
+    if (round) {
+      if (fraction < 1.5) niceFraction = 1;
+      else if (fraction < 3) niceFraction = 2;
+      else if (fraction < 7) niceFraction = 5;
+      else niceFraction = 10;
+    } else {
+      if (fraction <= 1) niceFraction = 1;
+      else if (fraction <= 2) niceFraction = 2;
+      else if (fraction <= 5) niceFraction = 5;
+      else niceFraction = 10;
+    }
+    return niceFraction * Math.pow(10, exponent);
+  }
+
+  // ---------------------------------------------------------------------
+  // World <-> screen mapping
+  // ---------------------------------------------------------------------
+  const MARGIN = { left: 54, right: 24, top: 24, bottom: 40 };
+
+  function getView() {
+    const availW = Math.max(cssW - MARGIN.left - MARGIN.right, 50);
+    const availH = Math.max(cssH - MARGIN.top - MARGIN.bottom, 50);
+    const scale = Math.min(availW / sim.bounds.xMax, availH / sim.bounds.yMax);
+    const originX = MARGIN.left;
+    const originY = cssH - MARGIN.bottom;
+    return { scale, originX, originY };
+  }
+
+  function w2s(view, x, y) {
+    return { x: view.originX + x * view.scale, y: view.originY - y * view.scale };
+  }
+
+  // ---------------------------------------------------------------------
+  // Drawing helpers
+  // ---------------------------------------------------------------------
+  function drawArrow(x0, y0, x1, y1, color, width) {
+    const dx = x1 - x0, dy = y1 - y0;
+    const len = Math.hypot(dx, dy);
+    if (len < 3) return;
+    ctx.strokeStyle = color;
+    ctx.fillStyle = color;
+    ctx.lineWidth = width;
+    ctx.lineCap = "round";
+    ctx.beginPath();
+    ctx.moveTo(x0, y0);
+    ctx.lineTo(x1, y1);
+    ctx.stroke();
+
+    const headLen = Math.min(9, len * 0.5);
+    const angle = Math.atan2(dy, dx);
+    ctx.beginPath();
+    ctx.moveTo(x1, y1);
+    ctx.lineTo(x1 - headLen * Math.cos(angle - Math.PI / 7), y1 - headLen * Math.sin(angle - Math.PI / 7));
+    ctx.lineTo(x1 - headLen * Math.cos(angle + Math.PI / 7), y1 - headLen * Math.sin(angle + Math.PI / 7));
+    ctx.closePath();
+    ctx.fill();
+  }
+
+  function drawPolyline(view, points, color, width, dashed) {
+    if (points.length < 2) return;
+    ctx.save();
+    ctx.strokeStyle = color;
+    ctx.lineWidth = width;
+    ctx.lineJoin = "round";
+    ctx.lineCap = "round";
+    if (dashed) ctx.setLineDash([7, 6]);
+    ctx.beginPath();
+    for (let i = 0; i < points.length; i++) {
+      const s = w2s(view, points[i].x, points[i].y);
+      if (i === 0) ctx.moveTo(s.x, s.y);
+      else ctx.lineTo(s.x, s.y);
+    }
+    ctx.stroke();
+    ctx.restore();
+  }
+
+  function render() {
+    const view = getView();
+
+    ctx.clearRect(0, 0, cssW, cssH);
+    ctx.fillStyle = "#0d1420";
+    ctx.fillRect(0, 0, cssW, cssH);
+
+    // ---- grid ----
+    if (toggleGrid.checked) {
+      const stepX = niceNum(sim.bounds.xMax / 8, true);
+      const stepY = niceNum(sim.bounds.yMax / 6, true);
+
+      ctx.strokeStyle = "rgba(255,255,255,0.06)";
+      ctx.lineWidth = 1;
+      ctx.font = "10px -apple-system, sans-serif";
+      ctx.fillStyle = "#5c6a80";
+
+      ctx.beginPath();
+      for (let gx = 0; gx <= sim.bounds.xMax + 1e-9; gx += stepX) {
+        const s = w2s(view, gx, 0);
+        ctx.moveTo(s.x, MARGIN.top);
+        ctx.lineTo(s.x, view.originY);
+      }
+      for (let gy = 0; gy <= sim.bounds.yMax + 1e-9; gy += stepY) {
+        const s = w2s(view, 0, gy);
+        ctx.moveTo(view.originX, s.y);
+        ctx.lineTo(cssW - MARGIN.right, s.y);
+      }
+      ctx.stroke();
+
+      ctx.textAlign = "center";
+      ctx.textBaseline = "top";
+      for (let gx = 0; gx <= sim.bounds.xMax + 1e-9; gx += stepX) {
+        const s = w2s(view, gx, 0);
+        ctx.fillText(gx.toFixed(stepX < 1 ? 1 : 0), s.x, view.originY + 6);
+      }
+      ctx.textAlign = "right";
+      ctx.textBaseline = "middle";
+      for (let gy = 0; gy <= sim.bounds.yMax + 1e-9; gy += stepY) {
+        const s = w2s(view, 0, gy);
+        ctx.fillText(gy.toFixed(stepY < 1 ? 1 : 0), view.originX - 8, s.y);
+      }
+    }
+
+    // ---- axis labels ----
+    ctx.fillStyle = "#8b98ad";
+    ctx.font = "11px -apple-system, sans-serif";
+    ctx.textAlign = "right";
+    ctx.textBaseline = "alphabetic";
+    ctx.fillText("x (m)", cssW - MARGIN.right, view.originY + 34 <= cssH - 6 ? view.originY + 34 : cssH - 6);
+    ctx.save();
+    ctx.translate(16, MARGIN.top + 4);
+    ctx.textAlign = "left";
+    ctx.fillText("y (m)", 0, 0);
+    ctx.restore();
+
+    // ---- ground ----
+    const groundY = w2s(view, 0, 0).y;
+    ctx.strokeStyle = "#37465c";
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.moveTo(view.originX, groundY);
+    ctx.lineTo(cssW - MARGIN.right, groundY);
+    ctx.stroke();
+
+    // launch pad marker
+    const pad = w2s(view, 0, 0);
+    ctx.fillStyle = "#2ec4b6";
+    ctx.beginPath();
+    ctx.moveTo(pad.x - 7, pad.y + 8);
+    ctx.lineTo(pad.x + 7, pad.y + 8);
+    ctx.lineTo(pad.x, pad.y - 4);
+    ctx.closePath();
+    ctx.fill();
+
+    // ---- trails ----
+    drawPolyline(view, sim.idealTrail, "rgba(147,161,184,0.85)", 1.6, true);
+    drawPolyline(view, sim.dragTrail, "#2ec4b6", 2.4, false);
+
+    // ---- markers ----
+    if (sim.hasLaunched) {
+      const si = w2s(view, sim.idealTrail.length ? sim.idealTrail[sim.idealTrail.length - 1].x : 0,
+                            sim.idealTrail.length ? sim.idealTrail[sim.idealTrail.length - 1].y : 0);
+      ctx.strokeStyle = "rgba(147,161,184,0.9)";
+      ctx.lineWidth = 1.4;
+      ctx.beginPath();
+      ctx.arc(si.x, si.y, 4.5, 0, Math.PI * 2);
+      ctx.stroke();
+
+      const sd = w2s(view, sim.x, sim.y);
+      ctx.fillStyle = "#2ec4b6";
+      ctx.beginPath();
+      ctx.arc(sd.x, sd.y, 6, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.strokeStyle = "#eafffb";
+      ctx.lineWidth = 1.6;
+      ctx.stroke();
+
+      // ---- velocity vectors ----
+      if (toggleVectors.checked && !sim.dragLanded) {
+        const PX_PER_MS = 4.2;
+        drawArrow(sd.x, sd.y, sd.x + sim.vx * PX_PER_MS, sd.y, "#f2a63d", 2.4);
+        drawArrow(sd.x, sd.y, sd.x, sd.y - sim.vy * PX_PER_MS, "#6f9dff", 2.4);
+        drawArrow(sd.x, sd.y, sd.x + sim.vx * PX_PER_MS, sd.y - sim.vy * PX_PER_MS, "#ff6b8b", 2.6);
+      }
+    }
+
+    scaleBadge.textContent = `scale: ${view.scale.toFixed(1)} px/m  ·  view: ${sim.bounds.xMax.toFixed(0)}×${sim.bounds.yMax.toFixed(0)} m`;
+  }
+
+  // ---------------------------------------------------------------------
+  // Telemetry
+  // ---------------------------------------------------------------------
+  function updateTelemetry() {
+    telT.textContent = `${sim.t.toFixed(2)} s`;
+    telX.textContent = `${sim.x.toFixed(2)} m`;
+    telY.textContent = `${sim.y.toFixed(2)} m`;
+    const v = Math.sqrt(sim.vx * sim.vx + sim.vy * sim.vy);
+    telV.textContent = `${(sim.dragLanded ? 0 : v).toFixed(2)} m/s`;
+    telHmax.textContent = `${sim.Hmax.toFixed(2)} m`;
+    telR.textContent = sim.R !== null ? `${sim.R.toFixed(2)} m` : "—";
+
+    telStatus.classList.remove("landed", "idle");
+    if (!sim.hasLaunched) {
+      telStatus.textContent = "Ready to Launch";
+      telStatus.classList.add("idle");
+    } else if (sim.dragLanded && sim.idealLanded) {
+      telStatus.textContent = "Landed";
+      telStatus.classList.add("landed");
+    } else if (sim.paused) {
+      telStatus.textContent = "Paused";
+    } else {
+      telStatus.textContent = "In Flight";
+    }
+  }
+
+  // ---------------------------------------------------------------------
+  // Main loop
+  // ---------------------------------------------------------------------
+  let accumulator = 0;
+  let lastTs = null;
+
+  function frame(ts) {
+    if (lastTs !== null) {
+      let realDt = (ts - lastTs) / 1000;
+      realDt = Math.min(realDt, 0.05); // guard against tab-switch spiral
+      if (sim.running && !sim.paused) {
+        const p = readParams();
+        const k = dragK(p);
+        accumulator += realDt * speedMult;
+        let steps = 0;
+        while (accumulator >= FIXED_DT && steps < MAX_SUBSTEPS_PER_FRAME) {
+          stepPhysics(FIXED_DT, p, k);
+          accumulator -= FIXED_DT;
+          steps++;
+          if (sim.dragLanded && sim.idealLanded) {
+            sim.running = false;
+            btnPause.disabled = true;
+            break;
+          }
+        }
+      }
+    }
+    lastTs = ts;
+    render();
+    updateTelemetry();
+    requestAnimationFrame(frame);
+  }
+
+  updateTelemetry();
+  requestAnimationFrame(frame);
+})();
+</script>
+</body>
+</html>
