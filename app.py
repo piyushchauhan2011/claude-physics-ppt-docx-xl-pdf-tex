@@ -1,4 +1,3 @@
-#!/usr/bin/env python3
 """Streamlit dashboard: 2D projectile motion with quadratic air drag,
 compared against the ideal (vacuum) trajectory, integrated with scipy's
 solve_ivp and visualized with Plotly."""
@@ -38,10 +37,10 @@ st.markdown(
 # Presets: (mass kg, radius m, drag coefficient)
 # ---------------------------------------------------------------------------
 PRESETS = {
-    "Baseball": dict(m=0.145, r=0.0369, Cd=0.30),
-    "Golf Ball": dict(m=0.0459, r=0.02135, Cd=0.25),
-    "Cannonball": dict(m=5.44, r=0.0600, Cd=0.47),
-    "Table Tennis Ball": dict(m=0.0027, r=0.0200, Cd=0.50),
+    "Baseball": {"m": 0.145, "r": 0.0369, "Cd": 0.30},
+    "Golf Ball": {"m": 0.0459, "r": 0.02135, "Cd": 0.25},
+    "Cannonball": {"m": 5.44, "r": 0.0600, "Cd": 0.47},
+    "Table Tennis Ball": {"m": 0.0027, "r": 0.0200, "Cd": 0.50},
 }
 
 
@@ -88,7 +87,7 @@ with st.sidebar:
 # ---------------------------------------------------------------------------
 
 def drag_odes(t, state, k, m, g):
-    x, y, vx, vy = state
+    _x, _y, vx, vy = state
     v = np.hypot(vx, vy)
     ax = -(k / m) * v * vx
     ay = -g - (k / m) * v * vy
@@ -186,18 +185,18 @@ def simulate(v0, theta_deg, y0, m, r, Cd, rho, g):
     E0 = 0.5 * m * v0 ** 2 + m * g * y0
     E_lost = E0 - E_drag
 
-    return dict(
-        k=k, landed=landed,
-        t_drag=t_drag, x_drag=x_drag, y_drag=y_drag, vx_drag=vx_drag, vy_drag=vy_drag, v_drag=v_drag,
-        t_ideal=t_idl, x_ideal=x_ideal, y_ideal=y_ideal, vx_ideal=vx_ideal, vy_ideal=vy_ideal, v_ideal=v_ideal,
-        t_land_drag=t_land_drag, t_land_ideal=t_ideal,
-        R_drag=R_drag, R_ideal=R_ideal,
-        H_drag=H_drag, H_ideal=H_ideal,
-        apex_idx_drag=apex_idx_drag,
-        impact_speed_drag=impact_speed_drag, impact_angle_drag=impact_angle_drag,
-        impact_speed_ideal=impact_speed_ideal, impact_angle_ideal=impact_angle_ideal,
-        KE_drag=KE_drag, PE_drag=PE_drag, E_drag=E_drag, E0=E0, E_lost=E_lost,
-    )
+    return {
+        "k": k, "landed": landed,
+        "t_drag": t_drag, "x_drag": x_drag, "y_drag": y_drag, "vx_drag": vx_drag, "vy_drag": vy_drag, "v_drag": v_drag,
+        "t_ideal": t_idl, "x_ideal": x_ideal, "y_ideal": y_ideal, "vx_ideal": vx_ideal, "vy_ideal": vy_ideal, "v_ideal": v_ideal,
+        "t_land_drag": t_land_drag, "t_land_ideal": t_ideal,
+        "R_drag": R_drag, "R_ideal": R_ideal,
+        "H_drag": H_drag, "H_ideal": H_ideal,
+        "apex_idx_drag": apex_idx_drag,
+        "impact_speed_drag": impact_speed_drag, "impact_angle_drag": impact_angle_drag,
+        "impact_speed_ideal": impact_speed_ideal, "impact_angle_ideal": impact_angle_ideal,
+        "KE_drag": KE_drag, "PE_drag": PE_drag, "E_drag": E_drag, "E0": E0, "E_lost": E_lost,
+    }
 
 
 res = simulate(v0, theta, y0, m, r, Cd, rho, g)
@@ -255,13 +254,13 @@ with tab1:
 
     fig.add_trace(go.Scatter(
         x=res["x_ideal"], y=res["y_ideal"], mode="lines", name="Ideal (vacuum)",
-        line=dict(color=RED, width=2.5, dash="dash"),
+        line={"color": RED, "width": 2.5, "dash": "dash"},
         customdata=np.stack([res["t_ideal"], res["v_ideal"]], axis=-1),
         hovertemplate="t=%{customdata[0]:.2f}s<br>x=%{x:.2f}m  y=%{y:.2f}m<br>v=%{customdata[1]:.2f}m/s<extra>Ideal</extra>",
     ))
     fig.add_trace(go.Scatter(
         x=res["x_drag"], y=res["y_drag"], mode="lines", name="With Drag",
-        line=dict(color=BLUE, width=3),
+        line={"color": BLUE, "width": 3},
         customdata=np.stack([res["t_drag"], res["v_drag"]], axis=-1),
         hovertemplate="t=%{customdata[0]:.2f}s<br>x=%{x:.2f}m  y=%{y:.2f}m<br>v=%{customdata[1]:.2f}m/s<extra>Drag</extra>",
     ))
@@ -270,25 +269,25 @@ with tab1:
     ideal_apex_i = int(np.argmax(res["y_ideal"]))
     fig.add_trace(go.Scatter(
         x=[res["x_ideal"][ideal_apex_i]], y=[res["y_ideal"][ideal_apex_i]], mode="markers",
-        marker=dict(symbol="star", size=13, color=RED, line=dict(color="white", width=1)),
+        marker={"symbol": "star", "size": 13, "color": RED, "line": {"color": "white", "width": 1}},
         name="Max Height (Ideal)",
         hovertemplate=f"Apex (Ideal)<br>H={res['H_ideal']:.2f} m<extra></extra>",
     ))
     fig.add_trace(go.Scatter(
         x=[res["x_drag"][apex_i]], y=[res["y_drag"][apex_i]], mode="markers",
-        marker=dict(symbol="star", size=13, color=BLUE, line=dict(color="white", width=1)),
+        marker={"symbol": "star", "size": 13, "color": BLUE, "line": {"color": "white", "width": 1}},
         name="Max Height (Drag)",
         hovertemplate=f"Apex (Drag)<br>H={res['H_drag']:.2f} m<extra></extra>",
     ))
     fig.add_trace(go.Scatter(
         x=[res["x_ideal"][-1]], y=[res["y_ideal"][-1]], mode="markers",
-        marker=dict(symbol="x", size=12, color=RED, line=dict(width=2)),
+        marker={"symbol": "x", "size": 12, "color": RED, "line": {"width": 2}},
         name="Impact (Ideal)",
         hovertemplate=f"Impact (Ideal)<br>R={res['R_ideal']:.2f} m<extra></extra>",
     ))
     fig.add_trace(go.Scatter(
         x=[res["x_drag"][-1]], y=[res["y_drag"][-1]], mode="markers",
-        marker=dict(symbol="x", size=12, color=BLUE, line=dict(width=2)),
+        marker={"symbol": "x", "size": 12, "color": BLUE, "line": {"width": 2}},
         name="Impact (Drag)",
         hovertemplate=f"Impact (Drag)<br>R={res['R_drag']:.2f} m<extra></extra>",
     ))
@@ -299,8 +298,8 @@ with tab1:
         xaxis_title="Horizontal Distance x (m)",
         yaxis_title="Height y (m)",
         height=560,
-        legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1),
-        margin=dict(l=10, r=10, t=60, b=10),
+        legend={"orientation": "h", "yanchor": "bottom", "y": 1.02, "xanchor": "right", "x": 1},
+        margin={"l": 10, "r": 10, "t": 60, "b": 10},
     )
     fig.update_yaxes(rangemode="tozero")
     st.plotly_chart(fig, use_container_width=True)
@@ -319,18 +318,18 @@ with tab2:
     for name, t, y, color, dash in series:
         fig2.add_trace(go.Scatter(
             x=t, y=y, mode="lines", name=name,
-            line=dict(color=color, width=2.5 if dash == "solid" else 2, dash=dash),
+            line={"color": color, "width": 2.5 if dash == "solid" else 2, "dash": dash},
             hovertemplate="t=%{x:.2f}s<br>%{y:.2f} m/s<extra>" + name + "</extra>",
         ))
-    fig2.add_hline(y=0, line=dict(color="#cccccc", width=1))
+    fig2.add_hline(y=0, line={"color": "#cccccc", "width": 1})
     fig2.update_layout(
         template="plotly_white",
         title="Velocity Components vs. Time",
         xaxis_title="Time t (s)",
         yaxis_title="Velocity (m/s)",
         height=560,
-        legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1),
-        margin=dict(l=10, r=10, t=60, b=10),
+        legend={"orientation": "h", "yanchor": "bottom", "y": 1.02, "xanchor": "right", "x": 1},
+        margin={"l": 10, "r": 10, "t": 60, "b": 10},
     )
     st.plotly_chart(fig2, use_container_width=True)
     st.caption("Dashed = ideal (vacuum) reference. Solid = with drag. Click legend entries to isolate a series.")
@@ -340,22 +339,22 @@ with tab3:
     fig3 = go.Figure()
     fig3.add_trace(go.Scatter(
         x=res["t_drag"], y=res["KE_drag"], mode="lines", name="Kinetic Energy",
-        stackgroup="energy", line=dict(width=0.5, color=TEAL), fillcolor="rgba(46,196,182,0.55)",
+        stackgroup="energy", line={"width": 0.5, "color": TEAL}, fillcolor="rgba(46,196,182,0.55)",
         hovertemplate="t=%{x:.2f}s<br>KE=%{y:.1f} J<extra></extra>",
     ))
     fig3.add_trace(go.Scatter(
         x=res["t_drag"], y=res["PE_drag"], mode="lines", name="Potential Energy",
-        stackgroup="energy", line=dict(width=0.5, color=GOLD), fillcolor="rgba(242,166,61,0.55)",
+        stackgroup="energy", line={"width": 0.5, "color": GOLD}, fillcolor="rgba(242,166,61,0.55)",
         hovertemplate="t=%{x:.2f}s<br>PE=%{y:.1f} J<extra></extra>",
     ))
     fig3.add_trace(go.Scatter(
         x=res["t_drag"], y=res["E_drag"], mode="lines", name="Total Mechanical Energy",
-        line=dict(color=NAVY, width=2.5),
+        line={"color": NAVY, "width": 2.5},
         hovertemplate="t=%{x:.2f}s<br>Total=%{y:.1f} J<extra></extra>",
     ))
     fig3.add_trace(go.Scatter(
         x=res["t_drag"], y=res["E_lost"], mode="lines", name="Energy Lost to Drag (cumulative)",
-        line=dict(color=RED, width=2.5, dash="dot"),
+        line={"color": RED, "width": 2.5, "dash": "dot"},
         hovertemplate="t=%{x:.2f}s<br>Lost=%{y:.1f} J<extra></extra>",
     ))
     fig3.update_layout(
@@ -364,8 +363,8 @@ with tab3:
         xaxis_title="Time t (s)",
         yaxis_title="Energy (J)",
         height=560,
-        legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1),
-        margin=dict(l=10, r=10, t=60, b=10),
+        legend={"orientation": "h", "yanchor": "bottom", "y": 1.02, "xanchor": "right", "x": 1},
+        margin={"l": 10, "r": 10, "t": 60, "b": 10},
     )
     st.plotly_chart(fig3, use_container_width=True)
     st.caption(
