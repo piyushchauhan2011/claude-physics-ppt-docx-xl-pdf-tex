@@ -135,6 +135,18 @@ def test_compute_drag_constant():
     assert compute_drag_constant(0.0, 0.47, 0.05) == 0.0
 
 
+def test_solve_trajectory_retries_span_when_initial_guess_undershoots():
+    # A very light, high-drag object dropped from a modest height approaches
+    # terminal velocity almost immediately, so it falls far slower than
+    # free-fall and its true flight time vastly exceeds the vacuum-based
+    # initial time-span guess. This forces solve_trajectory's retry loop
+    # (growing t_max and re-running solve_ivp) to actually execute more than
+    # once before the ground event fires.
+    result = solve_trajectory(0.0, 0.0, 5.0, 0.001, 1.0, 2.2, 1.2, G)
+    assert result["landed"] is True
+    assert result["T"] > 50.0  # vacuum free-fall from 5 m would be ~1 s
+
+
 def test_drag_derivatives():
     # Falling straight down at 10 m/s with no drag (k=0): pure gravity.
     dxdt, dydt, dvxdt, dvydt = drag_derivatives(0.0, [0.0, 5.0, 0.0, -10.0], k=0.0, m=1.0, g=9.81)
