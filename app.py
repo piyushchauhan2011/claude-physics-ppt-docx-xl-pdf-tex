@@ -5,7 +5,8 @@ solve_ivp and visualized with Plotly."""
 import numpy as np
 import plotly.graph_objects as go
 import streamlit as st
-from scipy.integrate import solve_ivp
+
+from physics import calculate_vacuum_analytical, solve_trajectory
 
 # ---------------------------------------------------------------------------
 # Page setup
@@ -83,117 +84,39 @@ with st.sidebar:
     st.caption("Set ρ = 0 to make the drag trajectory coincide exactly with the ideal curve.")
 
 # ---------------------------------------------------------------------------
-# Physics
+# Physics (core logic lives in physics.py — pure, unit-tested functions;
+# this wrapper just adapts/caches results for the dashboard's display needs)
 # ---------------------------------------------------------------------------
-
-def drag_odes(t, state, k, m, g):
-    _x, _y, vx, vy = state
-    v = np.hypot(vx, vy)
-    ax = -(k / m) * v * vx
-    ay = -g - (k / m) * v * vy
-    return [vx, vy, ax, ay]
-
-
-def make_ground_event():
-    def hit_ground(t, state, k, m, g):
-        return state[1]
-    hit_ground.terminal = True
-    hit_ground.direction = -1  # only a downward crossing counts as landing
-    return hit_ground
-
 
 @st.cache_data(show_spinner=False)
 def simulate(v0, theta_deg, y0, m, r, Cd, rho, g):
-    theta = np.radians(theta_deg)
-    vx0 = v0 * np.cos(theta)
-    vy0 = v0 * np.sin(theta)
-    k = 0.5 * rho * Cd * np.pi * r ** 2
+    ideal = calculate_vacuum_analytical(v0, theta_deg, y0, g)
+    drag = solve_trajectory(v0, theta_deg, y0, m, r, Cd, rho, g)
 
-    # --- Ideal (vacuum) trajectory: exact closed form ---
-    # y0 + vy0*t - 0.5*g*t^2 = 0, positive root
-    t_ideal = (vy0 + np.sqrt(max(vy0 ** 2 + 2 * g * y0, 0.0))) / g
+    apex_idx_drag = int(np.argmax(drag["y"]))
 
-    # --- Drag trajectory: numerical integration with a terminal ground event ---
-    # NOTE: unlike range/height, flight *time* under quadratic drag is not
-    # guaranteed to be shorter than the vacuum case (a light/draggy object
-    # can fall slower than free-fall once it nears terminal velocity on the
-    # way down), so we can't just trust t_ideal as an upper bound on the
-    # integration span. Retry with a growing span until the ground event
-    # actually fires.
-    event = make_ground_event()
-    span_mult = 4.0
-    base_guess = max(t_ideal, 0.5)
-    sol = None
-    for _ in range(6):
-        t_max = base_guess * span_mult
-        sol = solve_ivp(
-            drag_odes,
-            (0.0, t_max),
-            [0.0, y0, vx0, vy0],
-            args=(k, m, g),
-            events=event,
-            dense_output=True,
-            max_step=t_max / 2000,
-            rtol=1e-9,
-            atol=1e-10,
-        )
-        if sol.status == 1 and len(sol.t_events[0]) > 0:
-            break
-        span_mult *= 3.0
-        if t_max > 20000:
-            break
-
-    landed = sol.status == 1 and len(sol.t_events[0]) > 0
-    t_land_drag = sol.t_events[0][0] if landed else sol.t[-1]
-    land_state_drag = sol.y_events[0][0] if landed else sol.y[:, -1]
-
-    N = 400
-    t_drag = np.linspace(0, t_land_drag, N)
-    drag_state = sol.sol(t_drag)
-    x_drag, y_drag, vx_drag, vy_drag = drag_state
-    y_drag = np.clip(y_drag, 0, None)
-    v_drag = np.hypot(vx_drag, vy_drag)
-
-    t_idl = np.linspace(0, t_ideal, N)
-    x_ideal = vx0 * t_idl
-    y_ideal = np.clip(y0 + vy0 * t_idl - 0.5 * g * t_idl ** 2, 0, None)
-    vx_ideal = np.full_like(t_idl, vx0)
-    vy_ideal = vy0 - g * t_idl
-    v_ideal = np.hypot(vx_ideal, vy_ideal)
-
-    # --- KPIs ---
-    R_drag = float(land_state_drag[0])
-    R_ideal = float(vx0 * t_ideal)
-
-    H_drag = float(np.max(y_drag))
-    H_ideal = float(y0 + (vy0 ** 2) / (2 * g)) if vy0 > 0 else float(y0)
-
-    impact_vx_drag, impact_vy_drag = float(land_state_drag[2]), float(land_state_drag[3])
-    impact_speed_drag = float(np.hypot(impact_vx_drag, impact_vy_drag))
-    impact_angle_drag = float(np.degrees(np.arctan2(-impact_vy_drag, impact_vx_drag)))
-
-    impact_vy_ideal = vy0 - g * t_ideal
-    impact_speed_ideal = float(np.hypot(vx0, impact_vy_ideal))
-    impact_angle_ideal = float(np.degrees(np.arctan2(-impact_vy_ideal, vx0)))
-
-    apex_idx_drag = int(np.argmax(y_drag))
+    impact_vy_ideal = ideal["vy"][-1]
+    impact_speed_ideal = float(np.hypot(ideal["vx0"], impact_vy_ideal))
+    impact_angle_ideal = float(np.degrees(np.arctan2(-impact_vy_ideal, ideal["vx0"])))
 
     # --- Energy (drag case) ---
-    KE_drag = 0.5 * m * v_drag ** 2
-    PE_drag = m * g * y_drag
+    KE_drag = 0.5 * m * drag["v"] ** 2
+    PE_drag = m * g * drag["y"]
     E_drag = KE_drag + PE_drag
     E0 = 0.5 * m * v0 ** 2 + m * g * y0
     E_lost = E0 - E_drag
 
     return {
-        "k": k, "landed": landed,
-        "t_drag": t_drag, "x_drag": x_drag, "y_drag": y_drag, "vx_drag": vx_drag, "vy_drag": vy_drag, "v_drag": v_drag,
-        "t_ideal": t_idl, "x_ideal": x_ideal, "y_ideal": y_ideal, "vx_ideal": vx_ideal, "vy_ideal": vy_ideal, "v_ideal": v_ideal,
-        "t_land_drag": t_land_drag, "t_land_ideal": t_ideal,
-        "R_drag": R_drag, "R_ideal": R_ideal,
-        "H_drag": H_drag, "H_ideal": H_ideal,
+        "k": drag["k"], "landed": drag["landed"],
+        "t_drag": drag["t"], "x_drag": drag["x"], "y_drag": drag["y"],
+        "vx_drag": drag["vx"], "vy_drag": drag["vy"], "v_drag": drag["v"],
+        "t_ideal": ideal["t"], "x_ideal": ideal["x"], "y_ideal": ideal["y"],
+        "vx_ideal": ideal["vx"], "vy_ideal": ideal["vy"], "v_ideal": ideal["v"],
+        "t_land_drag": drag["T"], "t_land_ideal": ideal["T"],
+        "R_drag": drag["R"], "R_ideal": ideal["R"],
+        "H_drag": drag["H"], "H_ideal": ideal["H"],
         "apex_idx_drag": apex_idx_drag,
-        "impact_speed_drag": impact_speed_drag, "impact_angle_drag": impact_angle_drag,
+        "impact_speed_drag": drag["impact_speed"], "impact_angle_drag": drag["impact_angle"],
         "impact_speed_ideal": impact_speed_ideal, "impact_angle_ideal": impact_angle_ideal,
         "KE_drag": KE_drag, "PE_drag": PE_drag, "E_drag": E_drag, "E0": E0, "E_lost": E_lost,
     }

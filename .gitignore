@@ -2,6 +2,10 @@
 venv/
 __pycache__/
 *.pyc
+.pytest_cache/
+.coverage
+htmlcov/
+.ruff_cache/
 
 # LaTeX build artifacts (script cleans these up, but just in case)
 *.aux

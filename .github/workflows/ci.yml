@@ -27,15 +27,16 @@ jobs:
           cache: "pip"
 
       - name: Install dependencies
-        run: |
-          pip install -r requirements.txt
-          pip install ruff
+        run: pip install -r requirements.txt
 
       - name: Syntax check (py_compile)
-        run: python -m py_compile app.py
+        run: python -m py_compile app.py physics.py
 
       - name: Lint check (ruff)
-        run: ruff check app.py
+        run: ruff check app.py physics.py tests
+
+      - name: Run unit tests (pytest)
+        run: pytest -v
 
   build-and-test:
     name: Build & Integration Test
